@@ -98,7 +98,7 @@ button:focus-visible, .unit:focus-visible { outline: 2px solid var(--accent); ou
 .legend tbody tr { cursor: pointer; }
 .legend tbody tr:hover { background: #f2f5f9; }
 .legend tbody tr.selected { background: #e7eef8; font-weight: 600; }
-.legend .bar { width: 40%; }
+.legend .bar { width: 22%; }
 .legend .bar span { display: block; height: 0.55rem; border-radius: 2px; }
 .legend .num { text-align: right; }
 .legend .pct { text-align: right; color: var(--muted); }
@@ -131,19 +131,40 @@ button:focus-visible, .unit:focus-visible { outline: 2px solid var(--accent); ou
 .plan-svg:has(.unit.selected) .unit:not(.selected) { opacity: 0.4; }
 .plan-svg[data-floor='ground'] .mezz,
 .plan-svg[data-floor='ground'] .mezz-tint { display: none; }
-.plan-svg[data-floor='mezz'] .ground { fill-opacity: 0.1; stroke-dasharray: 1 0.8; }
-.plan-svg[data-floor='mezz'] .mezz-tint { fill-opacity: 0.85; }
-.plan-svg[data-floor='mezz'] .mezz { stroke-width: 0.35; stroke-dasharray: none; }
+.plan-svg[data-floor='upper'] .ground { fill-opacity: 0.1; stroke-dasharray: 1 0.8; }
+.plan-svg[data-floor='upper'] .mezz-tint { fill-opacity: 0.85; }
+.plan-svg[data-floor='upper'] .mezz { stroke-width: 0.35; stroke-dasharray: none; }
 
+.sheet { fill: rgba(255, 255, 255, 0.55); stroke: #8a96a6; stroke-width: 0.3; stroke-dasharray: 1.6 1; }
+.sheet-title { font-size: 1.9px; font-weight: 700; fill: var(--ink); }
 .plan-name, .plan-area, .plan-level { text-anchor: middle; pointer-events: none; fill: var(--ink); }
-.plan-name { font-size: 3px; font-weight: 700; }
-.plan-area { font-size: 2.3px; font-variant-numeric: tabular-nums; }
-.plan-level { font-size: 1.6px; fill: var(--muted); }
-.plan-caption { font-size: 2px; fill: var(--muted); font-style: italic; }
-.plan-scale { font-size: 1.6px; fill: var(--muted); }
-.plan-notice { font-size: 2.2px; fill: #c0392b; font-weight: 700; }
-.step-line { stroke: #c0392b; stroke-width: 0.4; stroke-dasharray: 1 0.6; }
-.step-text { font-size: 1.8px; fill: #c0392b; text-anchor: middle; font-weight: 600; }
+.plan-name { font-size: 2.4px; font-weight: 700; }
+.plan-area { font-size: 1.8px; font-variant-numeric: tabular-nums; }
+.plan-level { font-size: 1.35px; fill: #3d4855; font-variant-numeric: tabular-nums; }
+.plan-caption { font-size: 1.5px; fill: var(--muted); font-style: italic; }
+.plan-scale { font-size: 1.4px; fill: var(--muted); }
+.plan-notice { font-size: 1.6px; fill: #c0392b; font-weight: 700; }
+.scale-a { fill: var(--ink); }
+.scale-b { fill: #fff; stroke: var(--ink); stroke-width: 0.15; }
+.dim { stroke-width: 0.12; }
+.dim-M { stroke: var(--ink); fill: var(--ink); }
+.dim-D { stroke: #1f5fae; fill: #1f5fae; stroke-dasharray: 0.6 0.4; font-style: italic; }
+.dim-text { font-size: 1.3px; text-anchor: middle; dominant-baseline: middle; stroke: none; paint-order: stroke; font-variant-numeric: tabular-nums; }
+.step-line { stroke: #c0392b; stroke-width: 0.4; stroke-dasharray: 1 0.6; pointer-events: none; }
+.step-text { font-size: 1.4px; fill: #c0392b; text-anchor: middle; font-weight: 600; }
+
+/* Provenance tags */
+.tag { display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 0 0.3rem; border-radius: 3px; white-space: nowrap; vertical-align: 0.05rem; border: 1px solid; }
+.t-M { color: #1d5b2f; border-color: #8cc49d; background: #eaf6ee; }
+.t-D { color: #1f4f8a; border-color: #9ab8de; background: #ebf2fb; }
+.t-A { color: #8a5a00; border-color: #e3c27a; background: #fff4d6; }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.seg.small button { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+.details h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0.8rem 0 0.4rem; }
+.details .src { margin-top: 0.7rem; font-size: 0.75rem; }
+.legend thead th { font-size: 0.7rem; color: var(--muted); font-weight: 600; }
+.legend .key li { gap: 0.4rem; align-items: flex-start; }
+.label3d.sheet { pointer-events: none; font-weight: 600; background: rgba(255, 255, 255, 0.8); }
 
 /* 3D */
 #three-view canvas { display: block; touch-action: none; }
@@ -171,11 +192,39 @@ button:focus-visible, .unit:focus-visible { outline: 2px solid var(--accent); ou
   .app { grid-template-columns: 1fr; }
   .stage { order: -1; height: 62vh; min-height: 340px; }
   .sidebar { border-right: 0; border-top: 1px solid var(--line); overflow: visible; }
-  .unit-list { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .unit-list { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
   .hint { font-size: 0.68rem; right: 0.75rem; }
 }
 
 .notice-es { color: #c0392b !important; font-weight: 700; }
+
+/* Caveats (always visible) */
+.caveats {
+  background: var(--warn-bg); border: 1px solid #ecd28e; border-left: 4px solid #d29a1e;
+  border-radius: 6px; padding: 0.6rem 0.75rem; color: #5c3d00;
+}
+.caveats h2 { color: #5c3d00; margin-bottom: 0.35rem; }
+.caveats ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; font-size: 0.8rem; line-height: 1.35; }
+.warn-inline { color: #8a3b00; font-weight: 600; }
+.plan-warn { font-size: 1.25px; font-weight: 700; fill: #a3300f; text-anchor: middle; pointer-events: none; }
+.tag.mini { font-size: 0.6rem; padding: 0 0.2rem; margin-left: 0.15rem; vertical-align: 0.1rem; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.table-scroll { overflow-x: auto; }
+.notice3d-sub { display: block; margin-top: 0.15rem; font-size: 0.74rem; font-weight: 600; color: #8a3b00; }
+
+@media (max-width: 480px) {
+  .sidebar { padding: 0.8rem 0.8rem 1.5rem; }
+  .unit-list { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+  .details dl { grid-template-columns: 1fr; gap: 0.1rem; }
+  .details dd { margin-bottom: 0.4rem; }
+  .toolbar { gap: 0.4rem; padding: 0.5rem; }
+  .stamp { margin-left: 0; }
+  .notice3d { right: 0.75rem; font-size: 0.74rem; }
+  .banner { font-size: 0.78rem; padding: 0.4rem 0.6rem; }
+}
 .notice3d {
   position: absolute; top: 0.75rem; left: 0.75rem; z-index: 2; pointer-events: none;
   font-size: 0.8rem; font-weight: 700; color: #c0392b; background: rgba(255, 255, 255, 0.9);

@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import {
-  WAREHOUSES, WALL_HEIGHT, MEZZ_HEIGHT, MEZZ_FRACTION, LEVEL_STEP, fmt,
-} from './data.js';
+import { WAREHOUSES, SITES, WALL_HEIGHT, siteBox } from './data.js';
+import { t, fmt } from './i18n.js';
 
 /**
- * Orbitable schematic 3D massing. Coordinates are arbitrary model units (NOT
- * metres); plan x → x, plan y → z. Boxes are equal-sized placeholders.
+ * Orbitable 3D massing in metres. Plan x → x, plan y → z. Ground-floor outlines
+ * are extruded to an ASSUMED wall height; upper-floor zones are slabs at the
+ * measured (NAU 16) or assumed level. Floor levels within sheet A follow the
+ * measured spot levels (NAU 4–6 1.25 m below NAU 1–3).
  */
 export function createScene(container, { onSelect }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -20,95 +21,112 @@ export function createScene(container, { onSelect }) {
   container.appendChild(labelRenderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 2000);
-
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 3000);
   scene.add(new THREE.HemisphereLight(0xffffff, 0xb8c0cc, 1.6));
   const sun = new THREE.DirectionalLight(0xffffff, 1.4);
   sun.position.set(80, 140, 60);
   scene.add(sun);
 
-  // Centre the layout at the origin
-  const minX = Math.min(...WAREHOUSES.map((w) => w.x));
-  const maxX = Math.max(...WAREHOUSES.map((w) => w.x + w.width));
-  const minZ = Math.min(...WAREHOUSES.map((w) => w.z));
-  const maxZ = Math.max(...WAREHOUSES.map((w) => w.z + w.depth));
+  const boxes = SITES.map((s) => ({ s, b: siteBox(s.id) }));
+  const minX = Math.min(...boxes.map((x) => x.b.x0));
+  const maxX = Math.max(...boxes.map((x) => x.b.x1));
+  const minZ = Math.min(...boxes.map((x) => x.b.y0));
+  const maxZ = Math.max(...boxes.map((x) => x.b.y1));
   const cx = (minX + maxX) / 2;
   const cz = (minZ + maxZ) / 2;
   const span = Math.max(maxX - minX, maxZ - minZ);
 
-  const grid = new THREE.GridHelper(Math.ceil(span * 1.4 / 10) * 10, Math.ceil(span * 1.4 / 10), 0xc3cad3, 0xdde2e8);
-  grid.position.y = -0.02;
+  const gridSize = Math.ceil((span * 1.2) / 10) * 10;
+  const grid = new THREE.GridHelper(gridSize, gridSize / 10, 0xc3cad3, 0xdde2e8); // 10 m cells
+  grid.position.y = -0.03;
   scene.add(grid);
+
+  const shapeOf = (poly) => new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x - cx, -(y - cz))));
+  const extrude = (poly, h) => {
+    const geo = new THREE.ExtrudeGeometry(shapeOf(poly), { depth: h, bevelEnabled: false });
+    geo.rotateX(-Math.PI / 2);
+    return geo;
+  };
+  const mat = (color, opacity) => new THREE.MeshStandardMaterial({
+    color, transparent: true, opacity, roughness: 0.85, metalness: 0, depthWrite: opacity > 0.9,
+  });
+  const edgeMat = (o) => new THREE.LineBasicMaterial({ color: 0x1d2733, transparent: true, opacity: o });
+
+  const label = (cls, html, pos) => {
+    const div = document.createElement('div');
+    div.className = cls;
+    div.innerHTML = html;
+    const obj = new CSS2DObject(div);
+    obj.position.copy(pos);
+    scene.add(obj);
+    return div;
+  };
+
+  // Sheet frames on the ground
+  const sheetLabels = [];
+  for (const { s, b } of boxes) {
+    const p = [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]]
+      .map(([x, y]) => new THREE.Vector3(x - cx, 0.02, y - cz));
+    const frame = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(p),
+      new THREE.LineDashedMaterial({ color: 0x5f6b7a, dashSize: 2, gapSize: 1.2 }),
+    );
+    frame.computeLineDistances();
+    scene.add(frame);
+    sheetLabels.push({ s, div: label('label3d sheet', '', new THREE.Vector3(b.x0 - cx + 2, 0.5, b.y0 - cz + 1)) });
+  }
 
   const pickables = [];
   const units = new Map();
 
-  const mat = (color, opacity) => new THREE.MeshStandardMaterial({
-    color, transparent: true, opacity, roughness: 0.85, metalness: 0, depthWrite: opacity > 0.9,
-  });
-
   for (const w of WAREHOUSES) {
-    const g = new THREE.Group();
-    g.position.set(w.x - cx + w.width / 2, 0, w.z - cz + w.depth / 2);
-    const base = w.level ?? 0;
     const color = new THREE.Color(w.color);
+    const base = w.base;
 
-    // Plinth showing the ground-floor level (only visible where level > 0)
-    const plinthH = Math.max(base, 0) + 0.25;
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(w.width, plinthH, w.depth), mat(color, 1));
-    slab.position.y = base + 0.25 - plinthH / 2;
+    const slab = new THREE.Mesh(extrude(w.outline, base + 0.3), mat(color, 1));
+    slab.position.y = -0.0;
+    const volGeo = extrude(w.outline, WALL_HEIGHT);
+    const vol = new THREE.Mesh(volGeo, mat(color, 0.16));
+    vol.position.y = base + 0.3;
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(volGeo), edgeMat(0.55));
+    edges.position.y = vol.position.y;
 
-    // Walls / volume (translucent so internals are visible)
-    const volGeo = new THREE.BoxGeometry(w.width, WALL_HEIGHT, w.depth);
-    const vol = new THREE.Mesh(volGeo, mat(color, 0.18));
-    vol.position.y = base + 0.25 + WALL_HEIGHT / 2;
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(volGeo),
-      new THREE.LineBasicMaterial({ color: 0x1d2733, transparent: true, opacity: 0.55 }),
-    );
-    edges.position.copy(vol.position);
+    const mezz = [];
+    const mezzEdges = [];
+    for (const poly of w.mezz) {
+      const g = extrude(poly, 0.3);
+      const m = new THREE.Mesh(g, mat(color.clone().offsetHSL(0, -0.1, 0.12), 0.85));
+      m.position.y = base + 0.3 + w.mezzAbove;
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), edgeMat(0.7));
+      e.position.y = m.position.y;
+      mezz.push(m); mezzEdges.push(e);
+    }
 
-    // Indicative mezzanine placeholder — presence/extent unconfirmed for every unit
-    const md = w.depth * MEZZ_FRACTION;
-    const mezzGeo = new THREE.BoxGeometry(w.width - 0.4, 0.3, md);
-    const mezz = new THREE.Mesh(mezzGeo, mat(color.clone().offsetHSL(0, -0.1, 0.12), 0.85));
-    mezz.position.set(0, base + 0.25 + MEZZ_HEIGHT, -w.depth / 2 + md / 2 + 0.2);
-    const mezzEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(mezzGeo),
-      new THREE.LineBasicMaterial({ color: 0x1d2733, transparent: true, opacity: 0.7 }),
-    );
-    mezzEdges.position.copy(mezz.position);
-
-    for (const m of [slab, vol, mezz]) {
+    for (const m of [slab, vol, ...mezz]) {
       m.userData.id = w.id;
       pickables.push(m);
     }
-    g.add(slab, vol, edges, mezz, mezzEdges);
+    scene.add(slab, vol, edges, ...mezz, ...mezzEdges);
 
-    const div = document.createElement('div');
-    div.className = 'label3d';
-    div.innerHTML = `<b>${w.name}</b><span>${fmt(w.gross)} m² gross</span>`;
+    const ccx = (w.bbox.x0 + w.bbox.x1) / 2 - cx;
+    const ccz = (w.bbox.y0 + w.bbox.y1) / 2 - cz;
+    const div = label('label3d', '', new THREE.Vector3(ccx, base + WALL_HEIGHT + 2.5, ccz));
     div.addEventListener('pointerdown', (e) => e.stopPropagation());
     div.addEventListener('click', () => onSelect(w.id));
-    const label = new CSS2DObject(div);
-    label.position.set(0, base + WALL_HEIGHT + 2.5, 0);
-    g.add(label);
-
-    scene.add(g);
-    units.set(w.id, { slab, vol, edges, mezz, mezzEdges, div, color });
+    units.set(w.id, { slab, vol, edges, mezz, mezzEdges, div, color, w });
   }
 
-  // Level-step annotation between NAU 3 and NAU 4
-  {
-    const n3 = WAREHOUSES.find((w) => w.id === 'nau3');
-    const n4 = WAREHOUSES.find((w) => w.id === 'nau4');
-    const div = document.createElement('div');
-    div.className = 'label3d step';
-    div.textContent = `≈ ${LEVEL_STEP.toFixed(2)} m step (direction assumed)`;
-    const obj = new CSS2DObject(div);
-    obj.position.set((n3.x + n3.width + n4.x) / 2 - cx, LEVEL_STEP + 0.6, n3.z + n3.depth - cz + 2);
-    scene.add(obj);
+  // Level-step annotation on the NAU 3 / NAU 4–6 wall line (x = 47.5)
+  const stepDiv = label('label3d step', '', new THREE.Vector3(47.5 - cx, 2.2, 44 - cz));
+
+  function relabel() {
+    for (const { s, div } of sheetLabels) div.textContent = t(s.titleKey);
+    for (const u of units.values()) {
+      u.div.innerHTML = `<b>${u.w.name}</b><span>Σ ${fmt(u.w.areas.total)} m²</span>`;
+    }
+    stepDiv.textContent = `NAU 4–6: ${t('step')}`;
   }
+  relabel();
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -117,7 +135,7 @@ export function createScene(container, { onSelect }) {
   controls.maxDistance = span * 3;
 
   function resetView() {
-    camera.position.set(span * 0.35, span * 0.55, span * 0.85);
+    camera.position.set(span * 0.2, span * 0.55, span * 0.8);
     controls.target.set(0, 2, 0);
     controls.update();
   }
@@ -159,6 +177,7 @@ export function createScene(container, { onSelect }) {
 
   return {
     resetView,
+    relabel,
     setActive(on) {
       if (on && !running) { running = true; resize(); requestAnimationFrame(loop); }
       if (!on) running = false;
@@ -167,22 +186,25 @@ export function createScene(container, { onSelect }) {
       for (const [id, u] of units) {
         const on = id === selected;
         const dim = selected && !on;
-        const showGround = floor !== 'mezz';
+        const showGround = floor !== 'upper';
         const showMezz = floor !== 'ground';
 
-        u.slab.material.opacity = showGround ? (dim ? 0.45 : 1) : 0.15;
+        u.slab.material.opacity = showGround ? (dim ? 0.45 : 1) : 0.2;
         u.slab.material.depthWrite = u.slab.material.opacity > 0.9;
         u.vol.visible = showGround;
-        u.vol.material.opacity = on ? 0.32 : dim ? 0.08 : 0.18;
+        u.vol.material.opacity = on ? 0.3 : dim ? 0.06 : 0.16;
         u.edges.visible = showGround || on;
         u.edges.material.color.set(on ? 0x000000 : 0x1d2733);
-        u.edges.material.opacity = on ? 1 : dim ? 0.25 : 0.55;
+        u.edges.material.opacity = on ? 1 : dim ? 0.2 : 0.55;
 
-        u.mezz.visible = showMezz;
-        u.mezzEdges.visible = showMezz;
-        u.mezz.material.opacity = dim ? 0.3 : 0.85;
-
-        for (const m of [u.slab.material, u.vol.material, u.mezz.material]) {
+        for (const m of u.mezz) {
+          m.visible = showMezz;
+          m.material.opacity = dim ? 0.3 : 0.9;
+          m.material.emissive.copy(on ? u.color : new THREE.Color(0));
+          m.material.emissiveIntensity = on ? 0.35 : 0;
+        }
+        for (const e of u.mezzEdges) e.visible = showMezz;
+        for (const m of [u.slab.material, u.vol.material]) {
           m.emissive.copy(on ? u.color : new THREE.Color(0));
           m.emissiveIntensity = on ? 0.35 : 0;
         }

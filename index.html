@@ -3,55 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Reconstrucción esquemática, no es un plano de ingeniería. Schematic warehouse selector with diagram and 3D views." />
-    <title>Warehouse Selector — Schematic</title>
+    <meta name="description" content="Warehouse selector (NAU 1–6, NAU 16, Fornal 31) based on project floor plans. Measured, derived and assumed values are marked." />
+    <title>Warehouse selector — Esparreguera</title>
   </head>
   <body>
     <div class="banner" role="note">
-      <strong lang="es">Reconstrucción esquemática, no es un plano de ingeniería.</strong>
-      Schematic only, not to scale and not measured. Gross areas are totals that may include upper floors; they are not footprints or ground-floor areas.
-      Mezzanine presence, extent and per-floor areas are unconfirmed for every unit; the direction of the level step is assumed.
+      <strong lang="es">Basado en planos de proyecto; no es un levantamiento.</strong>
+      <span data-i18n="banner"></span>
     </div>
 
     <div class="app">
       <aside class="sidebar" aria-label="Warehouse selection">
         <header>
-          <h1>Warehouse selector</h1>
-          <p class="sub">8 units · schematic diagram &amp; 3D · not to scale</p>
+          <div class="head-row">
+            <h1 data-i18n="h1"></h1>
+            <div id="lang-seg" class="seg small" role="group" aria-label="Language / Язык">
+              <button type="button" data-lang="en">EN</button>
+              <button type="button" data-lang="ru">RU</button>
+            </div>
+          </div>
+          <p class="sub" data-i18n="sub"></p>
         </header>
 
+        <section id="caveats" class="caveats" role="note" aria-labelledby="caveats-title">
+          <h2 id="caveats-title" data-i18n="caveatsTitle"></h2>
+          <ul id="caveat-list"></ul>
+        </section>
+
         <section>
-          <h2>Units</h2>
+          <h2 data-i18n="units"></h2>
           <ul id="unit-list" class="unit-list"></ul>
         </section>
 
         <section>
-          <h2>Level</h2>
-          <div id="floor-seg" class="seg" role="group" aria-label="Level"></div>
+          <h2 data-i18n="level"></h2>
+          <div id="floor-seg" class="seg" role="group"></div>
         </section>
 
         <section id="details" class="details" aria-live="polite"></section>
 
         <section>
-          <h2>Area legend <span class="muted">(gross, m²)</span></h2>
+          <h2 data-i18n="legend"></h2>
           <div id="legend" class="legend"></div>
         </section>
       </aside>
 
       <main class="stage">
         <div class="toolbar">
-          <div id="view-seg" class="seg" role="group" aria-label="View">
-            <button type="button" data-view="plan" aria-pressed="true">2D diagram</button>
-            <button type="button" data-view="3d" aria-pressed="false">3D</button>
+          <div id="view-seg" class="seg" role="group">
+            <button type="button" data-view="plan" aria-pressed="true" data-i18n="view2d"></button>
+            <button type="button" data-view="3d" aria-pressed="false" data-i18n="view3d"></button>
           </div>
-          <button type="button" id="reset" class="btn">Reset view</button>
-          <span class="stamp" lang="es" title="Reconstrucción esquemática, no es un plano de ingeniería.">ESQUEMÁTICO · NO A ESCALA</span>
+          <button type="button" id="reset" class="btn" data-i18n="reset"></button>
+          <span class="stamp" data-i18n="stamp"></span>
         </div>
 
         <div id="plan-view" class="view"></div>
         <div id="three-view" class="view" hidden>
-          <div class="notice3d" lang="es">Reconstrucción esquemática, no es un plano de ingeniería.</div>
-          <div class="hint">Drag to orbit · right-drag / two-finger to pan · scroll / pinch to zoom · click a unit to select</div>
+          <div class="notice3d" role="note">
+            <span lang="es">Basado en planos de proyecto; no es un levantamiento.</span>
+            <span id="notice3d-heights" class="notice3d-sub"></span>
+          </div>
+          <div class="hint" data-i18n="hint3d"></div>
         </div>
       </main>
     </div>
