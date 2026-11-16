@@ -4,6 +4,8 @@ import {
 } from './data.js';
 import { t, fmt, fmtLevel, fmtPct, getLang, setLang } from './i18n.js';
 import { createPlan } from './plan.js';
+import { planAll } from './capacity.js';
+import { createCapacityPanel, capacityDetailsHTML, loadParams, saveParams } from './capacityUI.js';
 
 const FLOORS = [
   { id: 'all', key: 'floorAll' },
@@ -15,7 +17,11 @@ const state = {
   selected: WAREHOUSES.some((w) => w.id === location.hash.slice(1)) ? location.hash.slice(1) : null,
   floor: 'all',
   view: 'plan',
+  boxes: true, // show box-capacity layout
+  levels: 4, // levels drawn in 3D (4 or 6)
 };
+let params = loadParams();
+let capResults = null;
 
 const $ = (s) => document.querySelector(s);
 const byId = (id) => WAREHOUSES.find((w) => w.id === id);
@@ -117,6 +123,8 @@ for (const b of document.querySelectorAll('#lang-seg button')) {
     buildChrome();
     plan.rebuild();
     if (scene) scene.relabel();
+    capPanel.render();
+    update3dBoxes();
     render();
   });
 }
@@ -160,7 +168,8 @@ function renderDetails() {
     </dl>
     <h3>${t('dims')}</h3>
     <dl>${facts}</dl>
-    <p class="src"><span class="muted">${t('source')}:</span> ${esc(site.source)}</p>`;
+    <p class="src"><span class="muted">${t('source')}:</span> ${esc(site.source)}</p>
+    <div class="cap-detail">${capacityDetailsHTML(w, capResults?.get(w.id), params)}</div>`;
 }
 
 // ---- Views -----------------------------------------------------------------
@@ -169,10 +178,90 @@ buildChrome();
 const plan = createPlan($('#plan-view'), { onSelect: select });
 let scene = null; // lazily created on first 3D view
 
+// ---- Box-capacity simulation ---------------------------------------------------
+const capPanel = createCapacityPanel($('#capacity'), {
+  getParams: () => params,
+  onParams(np, { rerender }) {
+    params = np;
+    saveParams(params);
+    if (rerender) capPanel.render(); else capPanel.refresh();
+    scheduleCompute();
+  },
+  onSelect: select,
+});
+capPanel.render();
+
+let worker = null;
+let seq = 0;
+let pending = false;
+let timer = 0;
+
+function onCapResult({ data }) {
+  if (data.seq !== seq) return; // stale
+  pending = false;
+  if (data.error) { console.error(data.error); capPanel.setBusy(false); return; }
+  capResults = data.results;
+  capPanel.setResults(capResults);
+  plan.setCapacity(capResults, state.levels);
+  update3dBoxes();
+  renderDetails();
+}
+
+function makeWorker() {
+  try {
+    const w = new Worker(new URL('./capacity.worker.js', import.meta.url), { type: 'module' });
+    w.onmessage = onCapResult;
+    w.onerror = (e) => { console.error(e); worker = false; compute(); };
+    return w;
+  } catch {
+    return false;
+  }
+}
+
+// Off the main thread when possible; a newer request cancels an older one.
+function compute() {
+  const my = ++seq;
+  capPanel.setBusy(true);
+  if (worker !== false && typeof Worker !== 'undefined') {
+    if (worker && pending) { worker.terminate(); worker = null; }
+    if (!worker) worker = makeWorker();
+  }
+  if (worker) {
+    pending = true;
+    worker.postMessage({ seq: my, params });
+  } else {
+    // No worker support: compute on the main thread (one-off ~0.4 s).
+    setTimeout(() => onCapResult({ data: { seq: my, results: planAll(WAREHOUSES, params) } }), 0);
+  }
+}
+function scheduleCompute() {
+  clearTimeout(timer);
+  timer = setTimeout(compute, 180);
+}
+
+function update3dBoxes() {
+  if (!scene || !capResults) return;
+  const { columns } = scene.setBoxes(capResults, state.levels);
+  const n = [...capResults.values()].reduce((s, r) => s + r.layout.eligible[state.levels], 0);
+  $('#notice3d-boxes').textContent = columns ? t('capInstLimit')(fmt(n, 0)) : '';
+  scene.update(state);
+}
+
+$('#boxes-toggle').addEventListener('click', () => { state.boxes = !state.boxes; render(); });
+for (const b of document.querySelectorAll('#levels-seg button')) {
+  b.addEventListener('click', () => {
+    state.levels = Number(b.dataset.levels);
+    if (capResults) plan.setCapacity(capResults, state.levels);
+    update3dBoxes();
+    render();
+  });
+}
+
 async function ensureScene() {
   if (scene) return scene;
   const { createScene } = await import('./scene3d.js');
   scene = createScene($('#three-view'), { onSelect: select });
+  update3dBoxes();
   return scene;
 }
 
@@ -214,6 +303,11 @@ function render() {
   for (const tr of legend.querySelectorAll('tbody tr')) {
     tr.classList.toggle('selected', tr.dataset.id === state.selected);
   }
+  $('#boxes-toggle').setAttribute('aria-pressed', String(state.boxes));
+  for (const b of document.querySelectorAll('#levels-seg button')) {
+    b.setAttribute('aria-pressed', String(Number(b.dataset.levels) === state.levels));
+  }
+  capPanel.setSelected(state.selected);
   renderDetails();
   plan.update(state);
   if (scene) scene.update(state);
@@ -221,3 +315,4 @@ function render() {
 
 render();
 setView('plan');
+compute();

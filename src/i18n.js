@@ -1,5 +1,6 @@
 // Minimal EN / RU string table. Unit names and source-document titles are
 // proper names and are not translated.
+import { CAP_STR } from './i18n-capacity.js';
 
 const STR = {
   en: {
@@ -219,6 +220,9 @@ const STR = {
     nCompart: '«Construcció edifici industrial compartimentat en 3 naus» — 1 254.88 м² может относиться ко всему зданию',
   },
 };
+
+Object.assign(STR.en, CAP_STR.en);
+Object.assign(STR.ru, CAP_STR.ru);
 
 const params = new URLSearchParams(location.search);
 let lang = params.get('lang') || localStorage.getItem('lang') || (navigator.language?.startsWith('ru') ? 'ru' : 'en');

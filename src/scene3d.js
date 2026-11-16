@@ -3,6 +3,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { WAREHOUSES, SITES, WALL_HEIGHT, siteBox } from './data.js';
 import { t, fmt } from './i18n.js';
+import { BOX, GAP_V, stackHeight } from './capacity.js';
+
+// Above this many box instances, each stack is drawn as one column instead.
+const MAX_BOX_INSTANCES = 30000;
 
 /**
  * Orbitable 3D massing in metres. Plan x → x, plan y → z. Ground-floor outlines
@@ -116,6 +120,124 @@ export function createScene(container, { onSelect }) {
     units.set(w.id, { slab, vol, edges, mezz, mezzEdges, div, color, w });
   }
 
+  // ---- Box-capacity layout (instanced: one draw call per unit) ----------------
+  const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const flatGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const boxUnits = new Map(); // id → { boxes, flat }
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const vp = new THREE.Vector3();
+  const vs = new THREE.Vector3();
+  let boxView = { show: false, floor: 'all', selected: null };
+
+  function clearBoxes() {
+    for (const u of boxUnits.values()) {
+      for (const m of [u.boxes, u.flat, u.idle]) {
+        if (!m) continue;
+        scene.remove(m);
+        m.material.dispose();
+        m.dispose();
+        const i = pickables.indexOf(m);
+        if (i >= 0) pickables.splice(i, 1);
+      }
+    }
+    boxUnits.clear();
+  }
+
+  /** Build instanced boxes for all units; returns { columns } (true = simplified). */
+  function setBoxes(results, levels) {
+    clearBoxes();
+    if (!results) return { columns: false };
+    // Only kept positions that hold a FULL `levels` stack are drawn as boxes
+    // (same set as the scenario totals); reserved / too-low positions are
+    // shown as flat grey footprints.
+    const isFull = (L, i) => !L.reserved[i] && L.caps[i] >= levels;
+    let total = 0;
+    for (const r of results.values()) total += r.layout.eligible[levels] * levels;
+    const columns = total > MAX_BOX_INSTANCES;
+    for (const w of WAREHOUSES) {
+      const r = results.get(w.id);
+      if (!r) continue;
+      const L = r.layout;
+      const y0 = w.base + 0.3;
+      const n = columns ? L.eligible[levels] : L.eligible[levels] * levels;
+      const boxes = new THREE.InstancedMesh(boxGeo, new THREE.MeshLambertMaterial({
+        color: new THREE.Color(w.color).offsetHSL(0, 0.05, -0.1),
+      }), Math.max(n, 1));
+      let k = 0;
+      const idle = [];
+      L.stacks.forEach((st, i) => {
+        if (!isFull(L, i)) { idle.push(st); return; }
+        const lv = levels;
+        const x = (st[0] + st[2]) / 2 - cx;
+        const z = (st[1] + st[3]) / 2 - cz;
+        const sx = st[2] - st[0];
+        const sz = st[3] - st[1];
+        if (columns) {
+          const h = stackHeight(lv);
+          m4.compose(vp.set(x, y0 + h / 2, z), q, vs.set(sx, h, sz));
+          boxes.setMatrixAt(k++, m4);
+        } else {
+          for (let l = 0; l < lv; l++) {
+            m4.compose(vp.set(x, y0 + l * (BOX.H + GAP_V) + BOX.H / 2, z), q, vs.set(sx, BOX.H, sz));
+            boxes.setMatrixAt(k++, m4);
+          }
+        }
+      });
+      boxes.count = k;
+      boxes.instanceMatrix.needsUpdate = true;
+      boxes.computeBoundingSphere();
+      boxes.userData.id = w.id;
+
+      const rects = [...L.aisles, ...L.cross];
+      let flat = null;
+      if (rects.length) {
+        flat = new THREE.InstancedMesh(flatGeo, new THREE.MeshBasicMaterial({
+          color: 0xf3d27a, transparent: true, opacity: 0.55, depthWrite: false,
+        }), rects.length);
+        rects.forEach((a, i) => {
+          m4.compose(vp.set((a[0] + a[2]) / 2 - cx, y0 + 0.03, (a[1] + a[3]) / 2 - cz), q, vs.set(a[2] - a[0], 1, a[3] - a[1]));
+          flat.setMatrixAt(i, m4);
+        });
+        flat.instanceMatrix.needsUpdate = true;
+        flat.computeBoundingSphere();
+      }
+      let idleMesh = null;
+      if (idle.length) {
+        idleMesh = new THREE.InstancedMesh(flatGeo, new THREE.MeshBasicMaterial({
+          color: 0x9aa5b1, transparent: true, opacity: 0.7, depthWrite: false,
+        }), idle.length);
+        idle.forEach((a, i) => {
+          m4.compose(vp.set((a[0] + a[2]) / 2 - cx, y0 + 0.04, (a[1] + a[3]) / 2 - cz), q, vs.set(a[2] - a[0], 1, a[3] - a[1]));
+          idleMesh.setMatrixAt(i, m4);
+        });
+        idleMesh.instanceMatrix.needsUpdate = true;
+        idleMesh.computeBoundingSphere();
+      }
+      scene.add(boxes);
+      if (flat) scene.add(flat);
+      if (idleMesh) scene.add(idleMesh);
+      pickables.push(boxes);
+      boxUnits.set(w.id, { boxes, flat, idle: idleMesh });
+    }
+    applyBoxView();
+    return { columns };
+  }
+
+  function applyBoxView() {
+    const { show, floor, selected } = boxView;
+    for (const [id, u] of boxUnits) {
+      const vis = show && floor !== 'upper';
+      const dim = !!selected && id !== selected;
+      u.boxes.visible = vis;
+      u.boxes.material.transparent = dim;
+      u.boxes.material.opacity = dim ? 0.25 : 1;
+      u.boxes.material.depthWrite = !dim;
+      if (u.flat) u.flat.visible = vis && !dim;
+      if (u.idle) u.idle.visible = vis && !dim;
+    }
+  }
+
   // Level-step annotation on the NAU 3 / NAU 4–6 wall line (x = 47.5)
   const stepDiv = label('label3d step', '', new THREE.Vector3(47.5 - cx, 2.2, 44 - cz));
 
@@ -178,11 +300,14 @@ export function createScene(container, { onSelect }) {
   return {
     resetView,
     relabel,
+    setBoxes,
     setActive(on) {
       if (on && !running) { running = true; resize(); requestAnimationFrame(loop); }
       if (!on) running = false;
     },
-    update({ selected, floor }) {
+    update({ selected, floor, boxes }) {
+      boxView = { show: !!boxes, floor, selected };
+      applyBoxView();
       for (const [id, u] of units) {
         const on = id === selected;
         const dim = selected && !on;

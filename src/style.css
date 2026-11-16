@@ -230,3 +230,71 @@ button:focus-visible, .unit:focus-visible { outline: 2px solid var(--accent); ou
   font-size: 0.8rem; font-weight: 700; color: #c0392b; background: rgba(255, 255, 255, 0.9);
   border: 1px solid #e3a59d; padding: 0.3rem 0.55rem; border-radius: 4px;
 }
+
+/* ---- Box-capacity simulation ---- */
+.seg-wrap { display: inline-flex; align-items: center; gap: 0.35rem; }
+.seg-label { font-size: 0.8rem; color: var(--muted); }
+.btn.toggle[aria-pressed='true'] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+.capacity { border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem 0.9rem; }
+.capacity h3, .cap-detail h3 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0.9rem 0 0.35rem; }
+.capacity .note { font-size: 0.78rem; color: var(--muted); margin: 0.45rem 0 0; line-height: 1.4; }
+.cap-badge {
+  display: inline-block; margin: 0 0 0.3rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #c0392b; border: 1.5px solid #c0392b; border-radius: 4px; padding: 0.1rem 0.4rem;
+}
+.cap-badge.small { font-size: 0.62rem; }
+.capacity .cap-es { color: #c0392b; font-weight: 600; }
+.cap-key { list-style: none; padding: 0; margin: 0.6rem 0 0.4rem; font-size: 0.74rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.3rem 0.8rem; }
+.cap-key li { display: flex; align-items: center; }
+.sw.cap-sw-stack { background: #4b5b70; }
+.sw.cap-sw-aisle { background: #f3d27a; }
+.sw.cap-sw-reserved { background: #fff; border: 1px dashed #9aa5b1; }
+.sw.cap-sw-short { background: #b9c2cc; }
+.sw.cap-sw-cross { background: repeating-linear-gradient(-45deg, #f3d27a 0 2px, #c99a2e 2px 3px); }
+
+.cap-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; font-variant-numeric: tabular-nums; transition: opacity 0.15s; }
+.cap-table.busy { opacity: 0.45; }
+.cap-table th, .cap-table td { padding: 0.22rem 0.3rem; white-space: nowrap; }
+.cap-table th { text-align: left; font-weight: 500; }
+.cap-table thead th { font-size: 0.68rem; color: var(--muted); font-weight: 600; white-space: normal; vertical-align: bottom; }
+.cap-table .num { text-align: right; }
+.cap-table tbody tr { cursor: pointer; }
+.cap-table tbody tr:hover { background: #f2f5f9; }
+.cap-table tbody tr.selected { background: #e7eef8; font-weight: 600; }
+.cap-table tfoot th, .cap-table tfoot td { border-top: 1px solid var(--ink); font-weight: 700; }
+
+.cap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; font-size: 0.8rem; }
+.cap-list li { display: flex; flex-direction: column; }
+.cap-status { font-size: 0.75rem; }
+.cap-status.s-UNKNOWN { color: #8a5a00; }
+.cap-status.s-DOES_NOT_FIT { color: #a3300f; }
+.cap-status.s-FITS_GEOMETRICALLY { color: #1d5b2f; }
+.capacity .cap-ask { color: #1f4f8a; }
+.cap-warn { margin: 0; padding-left: 1.1rem; font-size: 0.78rem; line-height: 1.38; display: grid; gap: 0.3rem; color: #5c3d00; }
+
+.capacity details { margin-top: 0.8rem; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+.capacity summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; }
+.cap-form { display: grid; gap: 0.45rem; margin: 0.6rem 0; }
+.cap-f { display: grid; grid-template-columns: 1fr 6.5rem; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+.cap-f input[type='number'], .cap-f select { width: 100%; font: inherit; font-size: 0.82rem; padding: 0.2rem 0.3rem; border: 1px solid var(--line); border-radius: 4px; }
+.cap-f select { grid-column: 1 / -1; }
+.cap-f.cap-b { grid-template-columns: auto 1fr; align-items: start; }
+.cap-detail { margin-top: 0.4rem; }
+.cap-detail .note { font-size: 0.78rem; color: var(--muted); }
+
+/* Plan overlay */
+.cap-g { pointer-events: none; }
+.cap-stack { fill: #2c3a4b; fill-opacity: 0.78; stroke: #fff; stroke-width: 0.04; }
+.cap-aisle { fill: #f3d27a; fill-opacity: 0.6; }
+.cap-cross { fill: url(#cap-cross-hatch); stroke: #c99a2e; stroke-width: 0.1; }
+.cap-reserved { fill: #fff; fill-opacity: 0.85; stroke: #9aa5b1; stroke-width: 0.08; stroke-dasharray: 0.2 0.15; }
+.cap-short { fill: #b9c2cc; fill-opacity: 0.85; stroke: #fff; stroke-width: 0.04; }
+.plan-svg[data-boxes='off'] .cap-g,
+.plan-svg[data-floor='upper'] .cap-g { display: none; }
+.plan-svg[data-boxes='on'] .unit text { paint-order: stroke; stroke: rgba(255, 255, 255, 0.85); stroke-width: 0.22px; stroke-linejoin: round; }
+
+@media (max-width: 480px) {
+  .cap-f { grid-template-columns: 1fr 5.5rem; }
+  .seg-label { display: none; }
+}

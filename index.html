@@ -42,6 +42,8 @@
 
         <section id="details" class="details" aria-live="polite"></section>
 
+        <section id="capacity" class="capacity" aria-labelledby="cap-title"></section>
+
         <section>
           <h2 data-i18n="legend"></h2>
           <div id="legend" class="legend"></div>
@@ -54,6 +56,14 @@
             <button type="button" data-view="plan" aria-pressed="true" data-i18n="view2d"></button>
             <button type="button" data-view="3d" aria-pressed="false" data-i18n="view3d"></button>
           </div>
+          <button type="button" id="boxes-toggle" class="btn toggle" aria-pressed="true" data-i18n="capShow"></button>
+          <div class="seg-wrap">
+            <span class="seg-label" id="levels-label" data-i18n="capLevels"></span>
+            <div id="levels-seg" class="seg" role="group" aria-labelledby="levels-label">
+              <button type="button" data-levels="4" aria-pressed="true">4</button>
+              <button type="button" data-levels="6" aria-pressed="false">6</button>
+            </div>
+          </div>
           <button type="button" id="reset" class="btn" data-i18n="reset"></button>
           <span class="stamp" data-i18n="stamp"></span>
         </div>
@@ -63,6 +73,7 @@
           <div class="notice3d" role="note">
             <span lang="es">Basado en planos de proyecto; no es un levantamiento.</span>
             <span id="notice3d-heights" class="notice3d-sub"></span>
+            <span id="notice3d-boxes" class="notice3d-sub"></span>
           </div>
           <div class="hint" data-i18n="hint3d"></div>
         </div>

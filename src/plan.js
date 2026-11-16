@@ -29,9 +29,13 @@ export function createPlan(container, { onSelect }) {
   let svg;
   const units = new Map();
   let last = null;
+  let capResults = null;
+  let capLevels = 4; // scenario whose eligible stacks are highlighted
+  const capGroups = new Map();
 
   function build() {
     units.clear();
+    capGroups.clear();
     container.replaceChildren();
     const boxes = SITES.map((s) => ({ s, b: siteBox(s.id) }));
     const minX = Math.min(...boxes.map((x) => x.b.x0)) - 2;
@@ -50,6 +54,11 @@ export function createPlan(container, { onSelect }) {
     const defs = el('defs', {}, svg);
     const hatch = el('pattern', { id: 'mezz-hatch', width: 1.6, height: 1.6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
     el('line', { x1: 0, y1: 0, x2: 0, y2: 1.6, stroke: '#1d2733', 'stroke-width': 0.35, 'stroke-opacity': 0.6 }, hatch);
+    const xh = el('pattern', { id: 'cap-cross-hatch', width: 1.2, height: 1.2, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(-45)' }, defs);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 1.2, stroke: '#8a5a00', 'stroke-width': 0.25, 'stroke-opacity': 0.7 }, xh);
+    for (const w of WAREHOUSES) {
+      el('polygon', { points: pts(w.outline) }, el('clipPath', { id: `clip-${w.id}` }, defs));
+    }
 
     // Sheet frames
     for (const { s, b } of boxes) {
@@ -74,6 +83,8 @@ export function createPlan(container, { onSelect }) {
         el('polygon', { points: pts(m), fill: w.color, class: 'mezz-tint' }, g);
         el('polygon', { points: pts(m), fill: 'url(#mezz-hatch)', class: 'mezz' }, g);
       }
+      // Box-capacity overlay sits between the unit fill and its labels.
+      capGroups.set(w.id, el('g', { class: 'cap-g', 'clip-path': `url(#clip-${w.id})`, 'aria-hidden': 'true' }, g));
       const [cx, cy0] = centroid(w.outline);
       const small = w.bbox.y1 - w.bbox.y0 < 16;
       const cy = small ? cy0 - 2.2 : cy0;
@@ -94,6 +105,8 @@ export function createPlan(container, { onSelect }) {
       });
       units.set(w.id, { g, ground });
     }
+
+    drawCap();
 
     // Dimensions (measured = solid dark, derived = blue dashed with ≈)
     for (const d of DIMS) {
@@ -131,9 +144,41 @@ export function createPlan(container, { onSelect }) {
     if (last) update(last);
   }
 
+  const rectPath = (rects) => rects.map(([x0, y0, x1, y1]) => (
+    `M${x0.toFixed(3)} ${y0.toFixed(3)}H${x1.toFixed(3)}V${y1.toFixed(3)}H${x0.toFixed(3)}Z`)).join('');
+
+  // One path per layer per unit → a handful of DOM nodes at any stack count.
+  function drawCap() {
+    for (const w of WAREHOUSES) {
+      const g = capGroups.get(w.id);
+      const r = capResults?.get(w.id);
+      if (!g) continue;
+      g.replaceChildren();
+      if (!r) continue;
+      const L = r.layout;
+      if (L.cross.length) el('path', { d: rectPath(L.cross), class: 'cap-cross' }, g);
+      if (L.aisles.length) el('path', { d: rectPath(L.aisles), class: 'cap-aisle' }, g);
+      // Same split as the totals: full n-level stacks, reserved positions,
+      // and kept positions too low for a full n-level stack.
+      const full = [];
+      const reserved = [];
+      const short = [];
+      L.stacks.forEach((st, i) => {
+        if (L.reserved?.[i]) reserved.push(st);
+        else if ((L.caps?.[i] ?? Infinity) >= capLevels) full.push(st);
+        else short.push(st);
+      });
+      if (full.length) el('path', { d: rectPath(full), class: 'cap-stack' }, g);
+      if (short.length) el('path', { d: rectPath(short), class: 'cap-short' }, g);
+      if (reserved.length) el('path', { d: rectPath(reserved), class: 'cap-reserved' }, g);
+    }
+  }
+
   function update(state) {
     last = state;
     svg.dataset.floor = state.floor;
+    svg.dataset.boxes = state.boxes ? 'on' : 'off';
+
     for (const [id, u] of units) {
       const on = id === state.selected;
       u.g.classList.toggle('selected', on);
@@ -142,5 +187,9 @@ export function createPlan(container, { onSelect }) {
   }
 
   build();
-  return { update, rebuild: build };
+  return {
+    update,
+    rebuild: build,
+    setCapacity(results, levels = capLevels) { capResults = results; capLevels = levels; drawCap(); },
+  };
 }
