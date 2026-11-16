@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Reconstrucción esquemática, no es un plano de ingeniería. Schematic warehouse selector with diagram and 3D views." />
+    <title>Warehouse Selector — Schematic</title>
+  </head>
+  <body>
+    <div class="banner" role="note">
+      <strong lang="es">Reconstrucción esquemática, no es un plano de ingeniería.</strong>
+      Schematic only, not to scale and not measured. Gross areas are totals that may include upper floors; they are not footprints or ground-floor areas.
+      Mezzanine presence, extent and per-floor areas are unconfirmed for every unit; the direction of the level step is assumed.
+    </div>
+
+    <div class="app">
+      <aside class="sidebar" aria-label="Warehouse selection">
+        <header>
+          <h1>Warehouse selector</h1>
+          <p class="sub">8 units · schematic diagram &amp; 3D · not to scale</p>
+        </header>
+
+        <section>
+          <h2>Units</h2>
+          <ul id="unit-list" class="unit-list"></ul>
+        </section>
+
+        <section>
+          <h2>Level</h2>
+          <div id="floor-seg" class="seg" role="group" aria-label="Level"></div>
+        </section>
+
+        <section id="details" class="details" aria-live="polite"></section>
+
+        <section>
+          <h2>Area legend <span class="muted">(gross, m²)</span></h2>
+          <div id="legend" class="legend"></div>
+        </section>
+      </aside>
+
+      <main class="stage">
+        <div class="toolbar">
+          <div id="view-seg" class="seg" role="group" aria-label="View">
+            <button type="button" data-view="plan" aria-pressed="true">2D diagram</button>
+            <button type="button" data-view="3d" aria-pressed="false">3D</button>
+          </div>
+          <button type="button" id="reset" class="btn">Reset view</button>
+          <span class="stamp" lang="es" title="Reconstrucción esquemática, no es un plano de ingeniería.">ESQUEMÁTICO · NO A ESCALA</span>
+        </div>
+
+        <div id="plan-view" class="view"></div>
+        <div id="three-view" class="view" hidden>
+          <div class="notice3d" lang="es">Reconstrucción esquemática, no es un plano de ingeniería.</div>
+          <div class="hint">Drag to orbit · right-drag / two-finger to pan · scroll / pinch to zoom · click a unit to select</div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
